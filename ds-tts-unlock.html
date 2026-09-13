@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeepSeek 解锁朗读 · 书签版</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --card: #ffffff;
+    --line: #e4e7f0;
+    --text: #1c2333;
+    --muted: #667085;
+    --brand: #4d6bfe;
+    --brand-soft: #eef1ff;
+    --code-bg: #f2f4f9;
+    --ok: #1f8a5b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 20px 72px;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -.3px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 17px;
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 23px; height: 23px;
+    flex: 0 0 23px;
+    border-radius: 50%;
+    background: var(--brand-soft);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  p { margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  .muted { color: var(--muted); font-size: 14px; }
+  a { color: var(--brand); }
+  code {
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  .bm-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--brand-soft);
+    border: 1px dashed #b9c4ff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 4px 0 14px;
+  }
+  .bm {
+    display: inline-block;
+    padding: 11px 22px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff !important;
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(77,107,254,.3);
+    cursor: grab;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .bm:active { cursor: grabbing; }
+  .btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text);
+    padding: 8px 15px;
+    border-radius: 9px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: .15s;
+  }
+  .btn:hover { border-color: #c3cce8; background: #fafbff; }
+  .btn.ok { color: var(--ok); border-color: #b6e0cb; background: #f2fbf6; }
+  .kbd {
+    display: inline-block;
+    border: 1px solid var(--line);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 12px;
+    background: #fff;
+    font-family: ui-monospace, monospace;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 13px; margin-top: 30px; line-height: 1.9; }
+
+  /* ============================================================
+     动画演示
+     ============================================================ */
+  .demo-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .demo-head h2 { margin: 0; }
+
+  .stage-wrap { position: relative; width: 100%; overflow: hidden; border-radius: 12px; }
+  .stage-inner {
+    position: relative;
+    width: 860px; height: 460px;
+    transform-origin: top left;
+    background:
+      radial-gradient(120% 90% at 78% 0%, #f2f5fd 0%, #e8ecf7 55%, #e2e7f4 100%);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* —— 通用假窗口 —— */
+  .win {
+    position: absolute;
+    background: #fff;
+    border-radius: 11px;
+    box-shadow: 0 12px 30px rgba(28,35,51,.15), 0 2px 6px rgba(28,35,51,.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .win-a { left: 16px; top: 128px; width: 246px; height: 250px; z-index: 3; }
+  .win-b { left: 286px; top: 18px; width: 558px; height: 424px; z-index: 2; }
+
+  /* 窄屏（手机）：改成上下排布，逻辑画布变小 → 缩放比更大、看得清 */
+  .stage-inner.compact { width: 460px; height: 604px; }
+  .stage-inner.compact .win-a { left: 12px; top: 12px; width: 436px; height: 186px; }
+  .stage-inner.compact .win-a .abody { flex-direction: row; align-items: center; gap: 14px; padding: 12px 14px; }
+  .stage-inner.compact .win-a .dropzone { flex: 0 0 178px; padding: 16px 10px; }
+  .stage-inner.compact .win-a .atip { font-size: 11px; line-height: 1.7; }
+  .stage-inner.compact .win-b { left: 12px; top: 214px; width: 436px; height: 378px; }
+  .stage-inner.compact .win-b .side { flex: 0 0 92px; }
+  .stage-inner.compact .dup { display: none; }
+  .stage-inner.compact .bmbar.open { height: 28px; }
+
+  /* —— DeepSeek 窗口 —— */
+  .chrome { flex: 0 0 auto; background: #eceff6; border-bottom: 1px solid #dfe3ec; padding: 8px 10px 0; }
+  .tabrow { display: flex; gap: 6px; align-items: flex-end; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .winbtns { display: flex; align-items: center; gap: 5px; margin: 0 8px 0 2px; }
+  .tab {
+    display: flex; align-items: center; gap: 6px;
+    background: #fff; border-radius: 7px 7px 0 0;
+    padding: 6px 12px; font-size: 11.5px; color: #3a4256; font-weight: 600;
+    position: relative; top: 1px;
+  }
+  .tab .fav { width: 12px; height: 12px; border-radius: 3px; background: #4d6bfe; }
+  .toolbar { display: flex; align-items: center; gap: 7px; padding: 7px 10px; }
+  .navbtn {
+    width: 20px; height: 20px; border-radius: 5px; background: #dfe3ec;
+    display: flex; align-items: center; justify-content: center;
+    color: #7b8398; font-size: 11px;
+  }
+  .urlbar {
+    flex: 1; height: 26px; background: #fff;
+    border: 1px solid #e2e6f0; border-radius: 13px;
+    display: flex; align-items: center; gap: 7px; padding: 0 12px;
+    font-size: 11.5px; color: #4a5266;
+    transition: box-shadow .25s, border-color .25s;
+  }
+  .urlbar .lock { width: 9px; height: 11px; border-radius: 2px; background: #cfd5e4; position: relative; flex: 0 0 auto; }
+  .urlbar .lock::after {
+    content: ""; position: absolute; left: 1.4px; top: -5px;
+    width: 6px; height: 7px; border: 1.6px solid #cfd5e4; border-bottom: none;
+    border-radius: 5px 5px 0 0;
+  }
+  .urlbar.hl { box-shadow: 0 0 0 3px rgba(77,107,254,.22); border-color: #8fa4ff; }
+
+  .bmbar {
+    flex: 0 0 auto;
+    height: 0; overflow: hidden;
+    background: #f7f9fd;
+    border-bottom: 1px solid transparent;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 12px;
+    transition: height .38s cubic-bezier(.4,0,.2,1), border-color .38s;
+  }
+  .bmbar.open { height: 30px; border-bottom-color: #e4e8f2; }
+  .bmbar .bmhint { font-size: 10.5px; color: #a6aec2; letter-spacing: .5px; }
+  .bmslot {
+    display: flex; align-items: center; gap: 5px;
+    height: 20px; padding: 0 9px;
+    border-radius: 5px; font-size: 11px; color: #3a4256;
+    background: #fff; border: 1px dashed #c9d2e6;
+    opacity: 0; transform: scale(.9);
+    transition: opacity .22s, transform .22s, background .2s, border-color .2s, box-shadow .2s;
+  }
+  .bmslot { opacity: 0; transform: scale(.9); }
+  .bmslot.target { opacity: .8; transform: scale(1); }   /* 拖拽落点提示（虚线态） */
+  .bmslot.show { opacity: 1; transform: scale(1); background: #eef1ff; border: 1px solid #bfc9ff; font-weight: 600; }
+  .bmslot .fav2 { width: 9px; height: 9px; border-radius: 2px; background: #4d6bfe; }
+  .bmslot.press { transform: scale(.88); }
+  .bmslot.done { box-shadow: 0 0 0 3px rgba(77,107,254,.25); }
+
+  .page { flex: 1; display: flex; min-height: 0; background: #fff; position: relative; }
+  .side {
+    flex: 0 0 112px; background: #fafbfe; border-right: 1px solid #eef1f7;
+    padding: 10px 9px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .side .logo { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #2b3350; margin-bottom: 4px; }
+  .side .logo i { width: 14px; height: 14px; border-radius: 4px; background: #4d6bfe; display: block; }
+  .side .item { height: 8px; border-radius: 4px; background: #e9edf5; }
+  .side .item.w1 { width: 62%; } .side .item.w2 { width: 84%; } .side .item.w3 { width: 48%; }
+  .main { flex: 1; padding: 13px 15px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .bub { border-radius: 10px; padding: 8px 11px; font-size: 11px; line-height: 1.55; max-width: 78%; }
+  .bub.user { align-self: flex-end; background: #eef1ff; color: #34406b; }
+  .ans { align-self: flex-start; width: 86%; }
+  .ln { height: 7px; border-radius: 4px; background: #eef0f6; margin-bottom: 6px; }
+  .ln.a { width: 93%; } .ln.b { width: 76%; } .ln.c { width: 88%; } .ln.d { width: 44%; }
+  .acts {
+    display: flex; align-items: center; gap: 8px;
+    margin-top: 9px; padding-top: 8px; border-top: 1px dashed #eef0f6;
+  }
+  .act {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; color: #7b8398;
+    border: 1px solid #e6eaf3; border-radius: 999px;
+    padding: 3px 9px; background: #fff;
+  }
+  .act svg { width: 11px; height: 11px; display: block; }
+  .act.read {
+    opacity: 0; transform: scale(.55);
+    color: var(--brand); border-color: #bdc8ff; background: #f3f5ff; font-weight: 600;
+  }
+  .act.read.in { opacity: 1; transform: scale(1); animation: pop .5s cubic-bezier(.34,1.56,.64,1); }
+  .act.read.pulse { animation: ring 1.05s ease-out 2; }
+  @keyframes pop { 0% { transform: scale(.45); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes ring {
+    0% { box-shadow: 0 0 0 0 rgba(77,107,254,.5); }
+    100% { box-shadow: 0 0 0 12px rgba(77,107,254,0); }
+  }
+
+  /* —— 教程页窗口（拖拽的起点） —— */
+  .win-a .ahead {
+    flex: 0 0 auto;
+    background: #eceff6; border-bottom: 1px solid #dfe3ec;
+    padding: 7px 10px;
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 700; color: #3a4256;
+  }
+  .win-a .ahead .dots3 { display: flex; gap: 4px; margin-right: 3px; }
+  .win-a .ahead .dots3 span { width: 7px; height: 7px; border-radius: 50%; background: #d4d9e6; }
+  .win-a .abody {
+    flex: 1; padding: 14px 14px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    background: #fff;
+  }
+  .dropzone {
+    border: 1.5px dashed #c6d0ea;
+    border-radius: 10px;
+    background: var(--brand-soft);
+    padding: 20px 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex: 0 0 auto;
+    position: relative;
+    transition: background .3s, border-color .3s;
+  }
+  .dropzone .dz-empty {
+    display: none;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ok);
+  }
+  .dropzone.emptied { border-color: #c3e3d2; background: #f3fbf7; }
+  .dropzone.emptied .srcbtn { display: none; }
+  .dropzone.emptied .dz-empty { display: block; }
+  .srcbtn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 9px 17px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff; font-size: 12px; font-weight: 700;
+    box-shadow: 0 5px 14px rgba(77,107,254,.36);
+    white-space: nowrap;
+    transition: transform .95s cubic-bezier(.45,.05,.25,1), box-shadow .2s, opacity .25s;
+    z-index: 6;
+  }
+  .srcbtn.press { box-shadow: 0 2px 6px rgba(77,107,254,.34); transform: scale(.94); }
+  .srcbtn.gone { opacity: 0; }
+  .win-a .atip { font-size: 10.5px; color: #98a1b6; line-height: 1.6; }
+
+  /* —— 刷新遮罩 —— */
+  .reload {
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,.95);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    opacity: 0; pointer-events: none; transition: opacity .28s; z-index: 6;
+  }
+  .reload.on { opacity: 1; }
+  .spinner {
+    width: 26px; height: 26px;
+    border: 3px solid #dfe4f2; border-top-color: var(--brand);
+    border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .reload .rt { font-size: 11.5px; color: #6b7488; }
+  .prog { width: 150px; height: 6px; border-radius: 3px; background: #e9edf7; overflow: hidden; }
+  .prog i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#7d92ff,#4d6bfe); }
+  .prog.run i { animation: fill 1.4s cubic-bezier(.4,0,.2,1) forwards; }
+  @keyframes fill { to { width: 100%; } }
+
+  /* —— toast —— */
+  .toast {
+    position: absolute; left: 50%; top: 14px;
+    transform: translate(-50%, -14px);
+    background: #1f8a5b; color: #fff;
+    font-size: 11.5px; font-weight: 600;
+    padding: 6px 14px; border-radius: 999px;
+    box-shadow: 0 6px 16px rgba(31,138,91,.34);
+    opacity: 0; transition: all .35s cubic-bezier(.34,1.4,.64,1);
+    z-index: 7; white-space: nowrap;
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  /* —— 光标 —— */
+  .cursor {
+    position: absolute; left: 0; top: 0;
+    width: 20px; height: 20px;
+    transform: translate(700px, 420px);
+    transition: transform .62s cubic-bezier(.4,0,.2,1);
+    z-index: 9; pointer-events: none;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.22));
+  }
+  .cursor svg { width: 20px; height: 20px; display: block; }
+  .cursor.grab svg { transform: scale(.88); }
+  .cursor.click::after {
+    content: ""; position: absolute; left: 1px; top: 1px;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(77,107,254,.85); border-radius: 50%;
+    animation: rip .55s ease-out forwards;
+  }
+  @keyframes rip {
+    0% { transform: scale(.35); opacity: .95; }
+    100% { transform: scale(1.9); opacity: 0; }
+  }
+
+  /* —— 字幕 / 控制条 —— */
+  .cap {
+    margin-top: 14px;
+    background: var(--brand-soft);
+    border: 1px solid #dde3ff;
+    border-radius: 11px;
+    padding: 13px 16px;
+    min-height: 86px;
+  }
+  .cap-top { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+  .cap-step {
+    flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--brand);
+    background: #fff; border: 1px solid #cdd6ff; border-radius: 999px; padding: 2px 9px;
+  }
+  .cap-title { font-size: 15px; font-weight: 700; color: #2a3352; }
+  .cap-desc { font-size: 13.5px; color: #5a6379; margin: 0; min-height: 21px; }
+
+  .ctrl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .ctrl .spacer { flex: 1; }
+  .dots { display: flex; gap: 6px; align-items: center; }
+  .dots button {
+    width: 22px; height: 5px; border: none; border-radius: 3px;
+    background: #d8ddec; cursor: pointer; padding: 0; transition: .25s;
+  }
+  .dots button.on { background: var(--brand); width: 30px; }
+
+  @media (max-width: 620px) {
+    body { padding: 26px 14px 50px; }
+    .card { padding: 18px 16px; }
+    h1 { font-size: 22px; }
+    .cap-title { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>DeepSeek 解锁朗读</h1>
+  <p class="sub">官方「朗读 / TTS」入口还没灰度到你的账号？把下面这个按钮拖进书签栏，以后用的时候点一下就行 —— 不装任何扩展，不改账号数据。</p>
+
+  <div class="card">
+    <h2><span class="num">1</span>书签版（最快，不用装任何东西）</h2>
+
+    <div class="bm-bar">
+      <a class="bm" id="bm" href="javascript:void(0)">解锁 DS TTS</a>
+      <span class="muted">↑ 按住这个蓝色按钮，直接拖到浏览器书签栏</span>
+    </div>
+
+    <ol class="muted" style="margin-bottom:14px">
+      <li>把上面的蓝色按钮<b>拖到书签栏</b>松手（书签栏没显示就按 <span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">B</span>）。</li>
+      <li>打开 <code>chat.deepseek.com</code> 的任意对话页。</li>
+      <li>点一下书签栏里的 <b>解锁 DS TTS</b> → 页面自动刷新。</li>
+      <li>每条回答下方就多出一个喇叭，点它就能听。</li>
+    </ol>
+
+    <button class="btn" id="copyBm">复制书签代码（手机 / 手动建书签用）</button>
+    <p class="muted" style="margin-top:12px">手机上没有书签栏，可以新建一个书签、把地址粘进去，用的时候在地址栏搜这个书签名再点开。</p>
+  </div>
+
+  <div class="card">
+    <div class="demo-head">
+      <h2><span class="num">2</span>动画演示：跟着看一遍</h2>
+      <span class="muted" id="demoHint">自动循环播放</span>
+    </div>
+
+    <div class="stage-wrap" id="stageWrap">
+      <div class="stage-inner" id="stageInner">
+
+        <!-- 左：教程页窗口（蓝色按钮在这里） -->
+        <div class="win win-a">
+          <div class="ahead">
+            <span class="dots3"><span></span><span></span><span></span></span>
+            解锁 TTS · 本页
+          </div>
+          <div class="abody">
+            <div class="dropzone" id="dropzone">
+              <span class="srcbtn" id="srcBtn">解锁 DS TTS</span>
+              <span class="dz-empty">✓ 已拖到书签栏</span>
+            </div>
+            <div class="atip">按住这个蓝色按钮，<br>拖到浏览器的书签栏上松手。</div>
+          </div>
+        </div>
+
+        <!-- 右：DeepSeek 窗口 -->
+        <div class="win win-b">
+          <div class="chrome">
+            <div class="tabrow">
+              <div class="winbtns">
+                <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+              </div>
+              <div class="tab"><span class="fav"></span>DeepSeek</div>
+            </div>
+            <div class="toolbar">
+              <span class="navbtn">‹</span>
+              <span class="navbtn">›</span>
+              <span class="navbtn">⟳</span>
+              <div class="urlbar" id="urlbar"><span class="lock"></span>chat.deepseek.com</div>
+            </div>
+          </div>
+
+          <div class="bmbar" id="bmbar">
+            <div class="bmslot" id="bmslot"><span class="fav2"></span>解锁 DS TTS</div>
+            <span class="bmhint" id="bmhint">书签栏</span>
+          </div>
+
+          <div class="page">
+            <div class="side">
+              <div class="logo"><i></i>DeepSeek</div>
+              <div class="item w1"></div>
+              <div class="item w2"></div>
+              <div class="item w3"></div>
+              <div class="item w2"></div>
+            </div>
+            <div class="main">
+              <div class="bub user">帮我理一下 PLC 通讯超时的排查思路</div>
+              <div class="ans">
+                <div class="ln a"></div>
+                <div class="ln b"></div>
+                <div class="ln c"></div>
+                <div class="ln d"></div>
+                <div class="acts">
+                  <span class="act read">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 5 6 9H2v6h4l5 4V5z"></path>
+                      <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+                    </svg>朗读
+                  </span>
+                  <span class="act">复制</span>
+                  <span class="act">重试</span>
+                </div>
+              </div>
+
+              <div class="bub user dup">再讲讲 RS485 收发切换要注意什么</div>
+              <div class="ans dup">
+                <div class="ln b"></div>
+                <div class="ln c"></div>
+                <div class="ln d"></div>
+                <div class="acts">
+                  <span class="act read">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 5 6 9H2v6h4l5 4V5z"></path>
+                      <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+                    </svg>朗读
+                  </span>
+                  <span class="act">复制</span>
+                  <span class="act">重试</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="reload" id="reload">
+            <div class="spinner"></div>
+            <div class="prog" id="prog"><i></i></div>
+            <div class="rt" id="rtext">正在刷新页面…</div>
+          </div>
+
+          <div class="toast" id="toast">✓ 已解锁</div>
+        </div>
+
+        <!-- 光标 -->
+        <div class="cursor" id="cursor">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 3 19 12l-6 .9L10.6 19 5 3z" fill="#fff" stroke="#1c2333" stroke-width="1.6" stroke-linejoin="round"></path>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="cap">
+      <div class="cap-top">
+        <span class="cap-step" id="capStep">第 1 / 6 步</span>
+        <span class="cap-title" id="capTitle">打开 DeepSeek 对话页</span>
+      </div>
+      <p class="cap-desc" id="capDesc">浏览器里打开 chat.deepseek.com，登录自己的账号。</p>
+    </div>
+
+    <div class="ctrl">
+      <button class="btn" id="playBtn">暂停</button>
+      <button class="btn" id="replayBtn">重播</button>
+      <div class="dots" id="dots"></div>
+      <span class="spacer"></span>
+      <span class="muted">点小圆点可跳到任意一步</span>
+    </div>
+  </div>
+
+  <footer>
+    本地文件 · 不联网 · 无埋点<br>
+    这是客户端开关的改写，不属官方支持行为、可能随版本更新失效。想恢复官方状态，在 DeepSeek 页面控制台执行
+    <code>localStorage.removeItem('__ds_remote_feature_store_model'); location.reload()</code>
+  </footer>
+</div>
+
+<!-- ============ 书签代码源（运行时编码成 javascript: URL） ============ -->
+<script type="text/plain" id="bmsrc">
+javascript:(function(){var K="__ds_remote_feature_store_model";var raw=localStorage.getItem(K);if(!raw){alert("[DS-TTS] 没找到配置缓存 "+K+"\n请先正常打开一次 DeepSeek 对话页，刷新后再点。");return;}var s;try{s=JSON.parse(raw);}catch(e){alert("[DS-TTS] 缓存解析失败："+e);return;}var v=s&&s.entries&&s.entries.model_configs&&s.entries.model_configs.value;if(!v){alert("[DS-TTS] 缓存里没有 model_configs，请刷新页面后再试。");return;}var L=Array.isArray(v)?v:(Array.isArray(v.value)?v.value:Object.values(v));var n=0;L.forEach(function(c){if(c&&typeof c==="object"){c.tts_feature={};n++;}});s.remoteVersion=999999;localStorage.setItem(K,JSON.stringify(s));console.log("[DS-TTS] 已解锁 "+n+" 个 model_config，正在刷新…");location.reload();})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ================= 书签 URL 装配 ================= */
+  var raw = document.getElementById('bmsrc').textContent.trim();
+  var bmHref = raw.indexOf('javascript:') === 0
+    ? 'javascript:' + encodeURIComponent(raw.slice('javascript:'.length))
+    : raw;
+  var bmEl = document.getElementById('bm');
+  bmEl.setAttribute('href', bmHref);
+  bmEl.addEventListener('click', function (e) {
+    if (e.currentTarget.getAttribute('href') === 'javascript:void(0)') e.preventDefault();
+  });
+
+  document.getElementById('copyBm').addEventListener('click', function () {
+    var btn = this, original = btn.textContent;
+    function done() {
+      btn.textContent = '已复制 ✓ 手动建书签';
+      btn.classList.add('ok');
+      setTimeout(function () { btn.textContent = original; btn.classList.remove('ok'); }, 1800);
+    }
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = bmHref;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); done(); } catch (err) { alert('复制失败，请手动选中'); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(bmHref).then(done, fallback);
+    } else {
+      fallback();
+    }
+  });
+
+  /* ================= 动画演示 ================= */
+  var stageWrap = document.getElementById('stageWrap');
+  var stage = document.getElementById('stageInner');
+  var cursor = document.getElementById('cursor');
+  var srcBtn = document.getElementById('srcBtn');
+  var urlbar = document.getElementById('urlbar');
+  var bmbar = document.getElementById('bmbar');
+  var bmhint = document.getElementById('bmhint');
+  var bmslot = document.getElementById('bmslot');
+  var readBtns = Array.prototype.slice.call(document.querySelectorAll('.act.read'));
+  var dropzone = document.getElementById('dropzone');
+  function setRead(on) {
+    readBtns.forEach(function (b) { b.classList.toggle('in', on); });
+  }
+  var reload = document.getElementById('reload');
+  var prog = document.getElementById('prog');
+  var rtext = document.getElementById('rtext');
+  var toast = document.getElementById('toast');
+  var capStep = document.getElementById('capStep');
+  var capTitle = document.getElementById('capTitle');
+  var capDesc = document.getElementById('capDesc');
+  var dotsBox = document.getElementById('dots');
+  var playBtn = document.getElementById('playBtn');
+  var replayBtn = document.getElementById('replayBtn');
+  var demoHint = document.getElementById('demoHint');
+
+  /* 逻辑尺寸由 CSS 决定（宽屏 860×460 / 窄屏 460×604），按容器宽度整体缩放 ——
+     光标坐标全部走 getBoundingClientRect，所以两种布局下都自动正确 */
+  var scale = 1;
+  function fit() {
+    var avail = stageWrap.clientWidth || 860;
+    stage.classList.toggle('compact', avail < 560);
+    var w = stage.offsetWidth, h = stage.offsetHeight;   // offsetWidth 不受 transform 影响
+    scale = Math.min(1, avail / w);
+    stage.style.transform = 'scale(' + scale + ')';
+    stageWrap.style.height = (h * scale) + 'px';
+  }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  /* 元素中心点换算成逻辑坐标 */
+  function center(el) {
+    var s = stage.getBoundingClientRect();
+    var r = el.getBoundingClientRect();
+    return {
+      x: (r.left - s.left) / scale + (r.width / scale) / 2,
+      y: (r.top - s.top) / scale + (r.height / scale) / 2
+    };
+  }
+  function moveTo(el) {
+    var p = center(el);
+    cursor.style.transform = 'translate(' + (p.x - 2) + 'px,' + (p.y - 2) + 'px)';
+    return p;
+  }
+  function clickFx() {
+    cursor.classList.remove('click');
+    void cursor.offsetWidth;
+    cursor.classList.add('click');
+  }
+
+  /* ---------------- 6 步时间线 ---------------- */
+  var STEPS = [
+    {
+      title: '打开 DeepSeek 对话页',
+      desc: '浏览器里打开 chat.deepseek.com，登录自己的账号。',
+      hold: 2200,
+      enter: function () {
+        urlbar.classList.add('hl');
+        moveTo(urlbar);
+      },
+      exit: function () { urlbar.classList.remove('hl'); }
+    },
+    {
+      title: '把书签栏调出来',
+      desc: '按 Ctrl + Shift + B（Mac 是 ⌘ + Shift + B），让书签栏显示在地址栏下方。',
+      hold: 2000,
+      enter: function () {
+        bmbar.classList.add('open');
+        bmslot.classList.add('target');
+        moveTo(bmhint);
+      },
+      exit: null
+    },
+    {
+      title: '把蓝色按钮拖进书签栏',
+      desc: '按住那个「解锁 DS TTS」按钮，拖到书签栏的虚线框上松手 —— 它就成了一个书签。',
+      hold: 1500,
+      enter: function () {
+        srcBtn.classList.remove('gone');
+        moveTo(srcBtn);
+        return sleep(660).then(function () {
+          srcBtn.classList.add('press');
+          cursor.classList.add('grab');
+          clickFx();
+          return sleep(300).then(function () {
+            var a = center(srcBtn), b = center(bmslot);
+            cursor.style.transform = 'translate(' + (b.x - 2) + 'px,' + (b.y - 2) + 'px)';
+            srcBtn.classList.remove('press');
+            srcBtn.style.transform = 'translate(' + (b.x - a.x) + 'px,' + (b.y - a.y) + 'px)';
+            return sleep(1020);
+          }).then(function () {
+            cursor.classList.remove('grab');
+            // 松手：蓝色按钮「落」进书签栏，变成一个真书签
+            srcBtn.classList.add('gone');
+            dropzone.classList.add('emptied');
+            bmslot.classList.remove('target');
+            bmslot.classList.add('show');
+          });
+        });
+      },
+      exit: null
+    },
+    {
+      title: '在 DeepSeek 页点一下它',
+      desc: '以后每次要用，就点一下书签栏里的「解锁 DS TTS」。',
+      hold: 2200,
+      enter: function () {
+        moveTo(bmslot);
+        return sleep(640).then(function () {
+          clickFx();
+          bmslot.classList.add('press');
+          return sleep(240).then(function () {
+            bmslot.classList.remove('press');
+            bmslot.classList.add('done');
+          });
+        });
+      },
+      exit: null
+    },
+    {
+      title: '页面自动刷新，解锁完成',
+      desc: '脚本把配置里的开关补上之后自动刷新一次，不需要你手动做什么。',
+      hold: 2900,
+      enter: function () {
+        reload.classList.add('on');
+        prog.classList.remove('run');
+        void prog.offsetWidth;
+        prog.classList.add('run');
+        rtext.textContent = '正在刷新页面…';
+        return sleep(1450).then(function () {
+          rtext.textContent = '✓ 已补上 tts_feature';
+          toast.classList.add('on');
+          reload.classList.remove('on');
+          bmslot.classList.remove('done');
+        });
+      },
+      exit: function () { toast.classList.remove('on'); }
+    },
+    {
+      title: '回答下方多出「朗读」，点它就能听',
+      desc: '每条 AI 回答下面都会出现喇叭入口；DeepSeek 设置里还能换音色（贝壳 / 白浪 / 海星 / 暗潮）。',
+      hold: 2600,
+      enter: function () {
+        setRead(true);
+        return sleep(430).then(function () {
+          moveTo(readBtns[0]);
+          return sleep(640).then(function () {
+            clickFx();
+            readBtns[0].classList.add('pulse');
+            return sleep(950);
+          });
+        });
+      },
+      exit: function () { readBtns[0].classList.remove('pulse'); }
+    }
+  ];
+
+  /* ---------------- 状态与控制 ---------------- */
+  function reset() {
+    urlbar.classList.remove('hl');
+    bmbar.classList.remove('open');
+    bmslot.className = 'bmslot';
+    readBtns.forEach(function (b) { b.className = 'act read'; });
+    dropzone.classList.remove('emptied');
+    reload.classList.remove('on');
+    prog.classList.remove('run');
+    toast.classList.remove('on');
+    srcBtn.style.transition = 'none';
+    srcBtn.className = 'srcbtn';
+    srcBtn.style.transform = 'translate(0,0)';
+    void srcBtn.offsetWidth;
+    srcBtn.style.transition = '';
+    cursor.className = 'cursor';
+    cursor.style.transform = 'translate(' + (stage.offsetWidth - 96) + 'px,' + (stage.offsetHeight - 44) + 'px)';
+  }
+
+  var runId = 0, playing = false, atStep = 0, timer = null;
+  function clearTimer() { if (timer) { clearTimeout(timer); timer = null; } }
+
+  function showCap(i) {
+    capStep.textContent = '第 ' + (i + 1) + ' / ' + STEPS.length + ' 步';
+    capTitle.textContent = STEPS[i].title;
+    capDesc.textContent = STEPS[i].desc;
+    Array.prototype.forEach.call(dotsBox.children, function (b, k) {
+      b.classList.toggle('on', k === i);
+    });
+  }
+
+  function playFrom(i) {
+    var id = ++runId;
+    playing = true;
+    playBtn.textContent = '暂停';
+    clearTimer();
+    reset();
+
+    // 跳到第 N 步时，把前面几步的"结果态"直接补上，避免画面自相矛盾
+    for (var k = 0; k < i; k++) {
+      if (k >= 1) { bmbar.classList.add('open'); bmslot.classList.add('target'); }
+      if (k >= 2) { bmslot.classList.remove('target'); bmslot.classList.add('show'); srcBtn.classList.add('gone'); }
+      if (k >= 5) setRead(true);
+    }
+
+    function run(n) {
+      if (id !== runId || !playing) return;
+      atStep = n;
+      showCap(n);
+      var step = STEPS[n];
+      Promise.resolve(step.enter ? step.enter() : null).then(function () {
+        if (id !== runId || !playing) return;
+        timer = setTimeout(function () {
+          if (id !== runId || !playing) return;
+          if (step.exit) step.exit();
+          if (n + 1 < STEPS.length) {
+            run(n + 1);
+          } else {
+            timer = setTimeout(function () {   // 一轮播完，停一下再循环
+              if (id !== runId || !playing) return;
+              run(0);
+            }, 1600);
+          }
+        }, step.hold);
+      });
+    }
+    run(i);
+  }
+
+  STEPS.forEach(function (s, i) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.title = '第 ' + (i + 1) + ' 步：' + s.title;
+    b.addEventListener('click', function () { playFrom(i); demoHint.textContent = '自动循环播放'; });
+    dotsBox.appendChild(b);
+  });
+
+  playBtn.addEventListener('click', function () {
+    if (playing) {
+      playing = false;
+      runId++;
+      clearTimer();
+      playBtn.textContent = '继续';
+      demoHint.textContent = '已暂停';
+    } else {
+      playFrom(atStep || 0);
+      demoHint.textContent = '自动循环播放';
+    }
+  });
+
+  replayBtn.addEventListener('click', function () {
+    playFrom(0);
+    demoHint.textContent = '自动循环播放';
+  });
+
+  var reduceMotion = !!(window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  window.addEventListener('resize', fit);
+  fit();
+
+  if (reduceMotion) {
+    playing = false;
+    playBtn.textContent = '播放';
+    reset();
+    showCap(0);
+    demoHint.textContent = '已按系统设置暂停，可点「播放」';
+  } else {
+    playFrom(0);
+  }
+})();
+</script>
+</body>
+</html>
